@@ -165,6 +165,11 @@ return {
           meta = { context_window = 1048576 },
           opts = { can_reason = true, can_use_tools = true, has_vision = true },
         },
+        ["kimi-k3-256k"] = {
+          formatted_name = "Kimi K3 (256K)",
+          meta = { context_window = 262144 },
+          opts = { can_reason = true, can_use_tools = true, has_vision = true },
+        },
         ["kimi-k2.7-code"] = {
           formatted_name = "Kimi K2.7 Code",
           meta = { context_window = 262144 },
@@ -184,15 +189,15 @@ return {
       type = "string",
       optional = true,
       default = "max",
-      desc = "Constrains effort on reasoning for reasoning models. Only 'high' and 'max' are supported by DeepSeek V4.",
+      desc = "Constrains effort on reasoning for reasoning models. Options are 'low', 'high', and 'max'.",
       enabled = function(self)
         local model = adapter_utils.model(self)
-        if vim.tbl_contains({ "kimi-k3" }, model) then
+        if vim.tbl_contains({ "kimi-k3", "kimi-k3-256k" }, model) then
           return true
         end
         return false
       end,
-      choices = { "max" },
+      choices = { "low", "high", "max" },
     },
     ---@type CodeCompanion.Schema
     ["thinking.type"] = {
