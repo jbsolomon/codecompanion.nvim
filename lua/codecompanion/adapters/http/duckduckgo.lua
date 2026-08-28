@@ -17,7 +17,6 @@ return {
     ["User-Agent"] = "Mozilla/5.0 (X11; Linux x86_64; rv:153.0) Gecko/20100101 Firefox/153.0",
     ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     ["Accept-Language"] = "en-US,en;q=0.9",
-    ["Accept-Encoding"] = "gzip, deflate, br, zstd",
     ["Connection"] = "keep-alive",
     ["Upgrade-Insecure-Requests"] = "1",
     ["Sec-Fetch-Dest"] = "document",
@@ -36,7 +35,7 @@ return {
   methods = {
     tools = {
       web_search = {
-        ---Setup the adapter for the fetch webpage tool
+        ---Setup the adapter for the web_search tool
         ---@param self CodeCompanion.HTTPAdapter
         ---@param opts table Tool options
         ---@param data table The data from the LLM's tool call
@@ -47,9 +46,9 @@ return {
           })
         end,
 
-        ---Process the output from the fetch webpage tool
+        ---Process the output from the web_search tool
         ---@param self CodeCompanion.HTTPAdapter
-        ---@param data table The data returned from the fetch
+        ---@param data table The data returned from the request
         ---@return table{status: string, content: string}|nil
         callback = function(self, data)
           if data.status >= 300 then

@@ -456,6 +456,11 @@ function Client:request(payload, actions, opts)
     end,
   }
 
+  -- Let curl pick and decode the compression itself, since the server's chosen codec is not known ahead of time
+  if not (adapter.opts and adapter.opts.stream) then
+    request_opts.compressed = true
+  end
+
   if adapter.opts and adapter.opts.stream then
     local has_started_steaming = false
 
