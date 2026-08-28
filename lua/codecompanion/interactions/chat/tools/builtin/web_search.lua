@@ -55,8 +55,29 @@ return {
                 return cb({ status = "error", data = fmt(error_message_expanded, query, output.content) })
               end
 
+              if type(output.content) == "table" and #output.content == 0 then
+                log:error("[Web Search Tool] No results for %q (HTTP %s)", query, tostring(data.status))
+                return cb({
+                  status = "error",
+                  data = fmt(error_message_expanded, query, string.format("No results found (HTTP %s)", tostring(data.status))),
+                })
+              end
+
               return cb({ status = "success", data = output.content })
             end
+
+            local err_detail = "unknown error"
+            if type(err) == "table" then
+              if err.stderr and type(err.stderr) == "table" and err.stderr.status then
+                err_detail = string.format("HTTP %s", tostring(err.stderr.status))
+              else
+                err_detail = tostring(err.message or "unknown error")
+              end
+            elseif err then
+              err_detail = tostring(err)
+            end
+            log:error("[Web Search Tool] " .. error_message, query)
+            return cb({ status = "error", data = fmt(error_message_expanded, query, err_detail) })
           end,
         })
     end,
