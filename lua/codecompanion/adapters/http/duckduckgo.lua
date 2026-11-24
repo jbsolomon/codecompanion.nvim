@@ -1,4 +1,57 @@
 local fmt = string.format
+local named_entities = {
+  amp = "&",
+  apos = "'",
+  gt = ">",
+  lt = "<",
+  nbsp = " ",
+  quot = '"',
+}
+
+-- utf8.* does not exist on this LuaJIT build; emit the bytes by hand so numbered entities decode
+local function codepoint_to_utf8(codepoint)
+  if codepoint < 0x80 then
+    return string.char(codepoint)
+  elseif codepoint < 0x800 then
+    return string.char(0xC0 + bit.rshift(codepoint, 6), 0x80 + bit.band(codepoint, 0x3F))
+  elseif codepoint < 0x10000 then
+    return string.char(
+      0xE0 + bit.rshift(codepoint, 12),
+      0x80 + bit.band(bit.rshift(codepoint, 6), 0x3F),
+      0x80 + bit.band(codepoint, 0x3F)
+    )
+  end
+  return string.char(
+    0xF0 + bit.rshift(codepoint, 18),
+    0x80 + bit.band(bit.rshift(codepoint, 12), 0x3F),
+    0x80 + bit.band(bit.rshift(codepoint, 6), 0x3F),
+    0x80 + bit.band(codepoint, 0x3F)
+  )
+end
+
+local function decode_entities(text)
+  text = text:gsub("&#(%d+);", function(decimal)
+    return codepoint_to_utf8(decimal + 0)
+  end)
+  text = text:gsub("&#x(%x+);", function(hex)
+    return codepoint_to_utf8(tonumber(hex, 16))
+  end)
+  text = text:gsub("&(%a+);", function(name)
+    return named_entities[name] or "&" .. name .. ";"
+  end)
+  return text
+end
+
+-- DuckDuckGo wraps every result link in a redirect; unwrap it to the source URL
+local function result_url(href)
+  local uddg = href:match("[?&]uddg=([^&]*)")
+  if not uddg then
+    return decode_entities(href)
+  end
+  return uddg:gsub("%%(%x%x)", function(hex)
+    return string.char(tonumber(hex, 16))
+  end)
+end
 
 ---@class CodeCompanion.HTTPAdapter
 return {
@@ -69,16 +122,15 @@ return {
             )
           do
             table.insert(out, {
-              title = clean_html(title),
-              url = href,
-              content = clean_html(content),
+              title = decode_entities(clean_html(title)),
+              url = result_url(href),
+              content = decode_entities(clean_html(content)),
             })
           end
           if #out < 1 and data.body:find("challenge-form", 1, true) then
             return {
               status = "error",
-              content = data.body:find("challenge-form", 1, true) and "Engine thinks you're a bot"
-                or "No results found",
+              content = "Engine thinks you're a bot",
             }
           end
           return {

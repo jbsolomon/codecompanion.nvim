@@ -56,14 +56,6 @@ return {
                 return cb({ status = "error", data = fmt(error_message_expanded, query, output.content) })
               end
 
-              if type(output.content) == "table" and #output.content == 0 then
-                log:error("[Web Search Tool] No results for %q (HTTP %s)", query, tostring(data.status))
-                return cb({
-                  status = "error",
-                  data = fmt(error_message_expanded, query, string.format("No results found (HTTP %s)", tostring(data.status))),
-                })
-              end
-
               return cb({ status = "success", data = output.content })
             end
 
@@ -120,7 +112,8 @@ return {
           return fmt([[<attachment url="%s" title="%s">%s</attachment>]], result.url, result.title, result.content)
         end)
         :totable()
-      local llm_output = fmt([[%s]], table.concat(content, "\n"))
+      local llm_output = #content > 0 and table.concat(content, "\n")
+        or fmt("No results found for %q.", self.args.query)
 
       chat:add_tool_output(self, { content = llm_output })
     end,
