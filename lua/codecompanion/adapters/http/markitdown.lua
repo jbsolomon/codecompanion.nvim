@@ -9,6 +9,7 @@ return {
   opts = {
     stream = false,
     timeout = 120000, -- Timeout for the conversion (milliseconds)
+    command = { "markitdown" }, -- Command used to convert a page; prepend a runner like { "uvx", "markitdown" }
     ---Override the default HTTP request with a CLI-based one
     ---@param self CodeCompanion.HTTPClient
     ---@param _payload table
@@ -21,27 +22,31 @@ return {
         return actions.callback({ message = "No URL provided" }, nil)
       end
 
+      local command = self.adapter.opts.command
       local timeout = self.adapter.opts.timeout
+      local command_display = table.concat(command, " ")
 
       local function fail(message)
         log:error("[MarkItDown Adapter] %s", message)
         actions.callback({ message = message }, nil)
       end
 
-      local ok, job = pcall(vim.system, { "markitdown", url }, { text = true, timeout = timeout }, function(result)
+      local argv = vim.list_extend(vim.deepcopy(command), { url })
+
+      local ok, job = pcall(vim.system, argv, { text = true, timeout = timeout }, function(result)
         self.methods.schedule(function()
           if result.code == 124 then
-            return fail(fmt("`markitdown` timed out after %dms", timeout))
+            return fail(fmt("`%s` timed out after %dms", command_display, timeout))
           end
           if result.code ~= 0 then
-            return fail(fmt("Failed to run `markitdown` (exit %d): %s", result.code, result.stderr or ""))
+            return fail(fmt("Failed to run `%s` (exit %d): %s", command_display, result.code, result.stderr or ""))
           end
           actions.callback(nil, { body = result.stdout })
         end)
       end)
 
       if not ok then
-        return fail(fmt("Failed to run `markitdown`: %s", job))
+        return fail(fmt("Failed to run `%s`: %s", command_display, job))
       end
 
       return job

@@ -239,6 +239,24 @@ require("codecompanion").setup({
 })
 ```
 
+MarkItDown runs the `markitdown` command directly. To launch it through a runner, such as `uvx` when you have no system Python, set the adapter's `command`. The URL is appended to it:
+
+```lua
+require("codecompanion").setup({
+  adapters = {
+    http = {
+      extend = {
+        markitdown = {
+          opts = {
+            command = { "uvx", "markitdown" },
+          },
+        },
+      },
+    },
+  },
+})
+```
+
 ## Limitations
 
 - The tools are for HTTP adapters only. Agents like Claude Code bring their own web search
