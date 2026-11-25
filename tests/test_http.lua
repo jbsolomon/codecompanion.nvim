@@ -187,6 +187,53 @@ T["decompresses non-streaming responses when the adapter enables compression"] =
   h.eq(result, { async = true, sync = true })
 end
 
+T["replaces bytes that aren't valid UTF-8 in the body sent to the API"] = function()
+  local result = child.lua([[
+    local files = require("codecompanion.utils.files")
+
+    -- Stash the body each transport would hand to curl
+    _G.Client.static.methods.post = {
+      default = function(opts)
+        _G.__async_body = files.read(opts.body_file)
+        return { args = "mocked args", shutdown = function() end }
+      end,
+    }
+    _G.Client.static.methods.post_sync = {
+      default = function(opts)
+        _G.__sync_body = files.read(opts.body_file)
+        return { status = 200, headers = {}, body = "", exit = 0 }
+      end,
+    }
+
+    local adapter = __make_adapter({
+      handlers = {
+        -- A Windows console tool such as markitdown writes © to stdout as a bare 0xA9
+        form_messages = function()
+          return { messages = { { role = "user", content = "Copyright " .. string.char(0xA9) } } }
+        end,
+      },
+    })
+
+    local client = Client.new({ adapter = adapter })
+    client:request({ messages = {} }, { callback = function() end })
+    client:send_sync({ messages = {} })
+
+    local function inspect(body)
+      return {
+        replacement = body:find("\239\191\189", 1, true) ~= nil,
+        raw_byte = body:find(string.char(0xA9), 1, true) ~= nil,
+      }
+    end
+
+    return { async = inspect(__async_body), sync = inspect(__sync_body) }
+  ]])
+
+  for _, transport in ipairs({ result.async, result.sync }) do
+    h.eq(transport.replacement, true)
+    h.eq(transport.raw_byte, false)
+  end
+end
+
 T["invokes on_error callback with error"] = function()
   local result = child.lua([[
     -- Override POST to trigger on_error

@@ -352,4 +352,80 @@ function M.truncate(tbl, max_len)
   return output
 end
 
+-- Written out in bytes because LuaJIT has no `utf8` module to name it with
+local UTF8_REPLACEMENT_CHARACTER = "\239\191\189" -- U+FFFD
+local NON_ASCII_BYTES = "[\128-\255]"
+
+local function is_continuation(byte)
+  return byte ~= nil and byte >= 0x80 and byte <= 0xBF
+end
+
+---The width of the UTF-8 sequence starting at `position`, or nil when the bytes there don't form one
+---@param text string
+---@param position number
+---@return number?
+local function utf8_sequence_width(text, position)
+  local lead = text:byte(position)
+  local second = text:byte(position + 1)
+
+  local width
+  if lead >= 0xC2 and lead <= 0xDF then
+    width = 2
+  elseif lead >= 0xE0 and lead <= 0xEF then
+    width = 3
+  elseif lead >= 0xF0 and lead <= 0xF4 then
+    width = 4
+  else
+    return nil
+  end
+
+  -- Beyond the lead byte, these ranges would give an overlong encoding, a UTF-16 surrogate or a
+  -- codepoint past U+10FFFF, and the API hosts reject the whole request for them
+  if not is_continuation(second) then
+    return nil
+  end
+  if (lead == 0xE0 and second < 0xA0) or (lead == 0xED and second >= 0xA0) then
+    return nil
+  end
+  if (lead == 0xF0 and second < 0x90) or (lead == 0xF4 and second > 0x8F) then
+    return nil
+  end
+
+  for offset = 2, width - 1 do
+    if not is_continuation(text:byte(position + offset)) then
+      return nil
+    end
+  end
+
+  return width
+end
+
+---Replace every byte that isn't part of a valid UTF-8 sequence with U+FFFD
+---@param text string
+---@return string
+function M.ensure_valid_utf8(text)
+  local parts = {}
+  local clean_from = 1
+  local position = text:find(NON_ASCII_BYTES)
+
+  while position do
+    local width = utf8_sequence_width(text, position)
+    if width then
+      position = text:find(NON_ASCII_BYTES, position + width)
+    else
+      table.insert(parts, text:sub(clean_from, position - 1))
+      table.insert(parts, UTF8_REPLACEMENT_CHARACTER)
+      clean_from = position + 1
+      position = text:find(NON_ASCII_BYTES, clean_from)
+    end
+  end
+
+  if #parts == 0 then
+    return text
+  end
+
+  table.insert(parts, text:sub(clean_from))
+  return table.concat(parts)
+end
+
 return M

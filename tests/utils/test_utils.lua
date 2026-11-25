@@ -321,4 +321,23 @@ T["Utils"]["timestamp_from_iso()"]["returns nil for an unparseable string"] = fu
   h.eq(result, vim.NIL)
 end
 
+T["Utils"]["ensure_valid_utf8()"] = MiniTest.new_set()
+
+T["Utils"]["ensure_valid_utf8()"]["replaces a byte that isn't valid UTF-8 with U+FFFD"] = function()
+  -- Byte escapes throughout, so the encoding of this file can't change what's asserted
+  local result = child.lua([[return utils.ensure_valid_utf8("Copyright " .. string.char(0xA9) .. " 2026")]])
+  h.eq(result, "Copyright \239\191\189 2026")
+end
+
+T["Utils"]["ensure_valid_utf8()"]["DOES NOT change text that is ALREADY valid UTF-8"] = function()
+  local result = child.lua([[return utils.ensure_valid_utf8("caf\195\169 \226\128\147 \240\159\152\128")]])
+  h.eq(result, "caf\195\169 \226\128\147 \240\159\152\128")
+end
+
+T["Utils"]["ensure_valid_utf8()"]["replaces only the truncated bytes of an incomplete sequence"] = function()
+  -- A 3-byte sequence cut in half is two bytes short, and both are replaced
+  local result = child.lua([[return utils.ensure_valid_utf8("euro \226\130")]])
+  h.eq(result, "euro \239\191\189\239\191\189")
+end
+
 return T

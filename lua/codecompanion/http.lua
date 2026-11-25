@@ -133,7 +133,16 @@ end
 ---@param opts { adapter: CodeCompanion.HTTPAdapter, payload: CodeCompanion.HTTPPayload }
 ---@return string
 local function encode_body(self, opts)
-  return self.methods.encode(Client.merge_body(opts.adapter, opts.payload))
+  local encoded = self.methods.encode(Client.merge_body(opts.adapter, opts.payload))
+
+  -- Tool output can carry bytes that aren't valid UTF-8, which vim.json.encode passes straight through
+  -- and the API host then rejects for the whole request
+  local body = utils.ensure_valid_utf8(encoded)
+  if body ~= encoded then
+    log:debug("Request body had invalid UTF-8 bytes replaced with U+FFFD")
+  end
+
+  return body
 end
 
 ---Assemble the curl args shared by every request, plus the adapter's headers file
